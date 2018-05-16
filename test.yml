@@ -1,0 +1,17 @@
+commands:
+  - mouse:
+      x: 200
+      y: 200
+      relative: false
+  - click:
+      button: left
+  - keypress:
+      key: enter
+      mods:
+        - control
+        - shift
+  - sleep:
+      seconds: 1
+  - exec:
+      program: ls
+      args: /home

@@ -1,5 +1,7 @@
 # RobotScript
 
+[![Build Status](https://travis-ci.com/christopher-dG/robotscript.svg?branch=master)](https://travis-ci.com/christopher-dG/robotscript)
+
 **RobotScript is a scriptable, cross-platform desktop automation tool.**
 
 ## Installation
@@ -16,7 +18,7 @@ robotscript script.yml
 ## Script Reference
 
 ```
-TODO
+TODO (look in test.yml for now)
 ```
 
 ### Acknowledgements

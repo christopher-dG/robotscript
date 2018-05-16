@@ -1,0 +1,30 @@
+language: go
+go:
+  - 1.10.x
+  - master
+
+addons:
+  apt:
+    update: true
+    packages:  # For robotgo (https://github.com/go-vgo/robotgo#ubuntu).
+      - gcc
+      - libc6-dev
+      - libx11-dev
+      - xorg-dev
+      - libxtst-dev
+      - libpng++-dev
+      - xcb
+      - libxcb-xkb-dev
+      - x11-xkb-utils
+      - libx11-xcb-dev
+      - libxkbcommon-x11-dev
+      - libxkbcommon-dev
+      - xsel
+      - xclip
+
+install: go get -t -v ./...
+# Tests can't be run; robotgo requires a keyboard.
+script: go build -v cmd/robotscript/main.go
+
+notifications:
+  email: false

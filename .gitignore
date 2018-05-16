@@ -1,5 +1,7 @@
 *.yml
 *.yaml
+!.travis.yml
+!test.yml
 main
 robotscript
 !cmd/robotscript
