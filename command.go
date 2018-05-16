@@ -169,20 +169,26 @@ func NewKeyPressCommand(options yaml.Map) (*KeyPressCommand, error) {
 			if err != nil {
 				return nil, err
 			}
-			c.Key = strings.TrimSpace(strings.ToLower(scalar.String()))
+			c.Key = canonicalize(scalar.String())
 
 		case "mods":
+			var mods []string
+
 			modNodes, err := toList(val)
 			if err != nil {
-				return nil, err
-			}
-			var mods []string
-			for _, node := range modNodes {
-				scalar, err := toScalar(node)
+				modScalar, err := toScalar(val)
 				if err != nil {
 					return nil, err
 				}
-				mods = append(mods, strings.TrimSpace(strings.ToLower(scalar.String())))
+				mods = append(mods, modScalar.String())
+			} else {
+				for _, node := range modNodes {
+					scalar, err := toScalar(node)
+					if err != nil {
+						return nil, err
+					}
+					mods = append(mods, canonicalize(scalar.String()))
+				}
 			}
 			c.Mods = mods
 
@@ -196,11 +202,19 @@ func NewKeyPressCommand(options yaml.Map) (*KeyPressCommand, error) {
 
 // Execute executes the command.
 func (c *KeyPressCommand) Execute() {
+	// Sometimes the key stays pressed for some reason, so we release it manually.
 	if len(c.Mods) > 0 {
 		robotgo.KeyTap(c.Key, c.Mods)
+		// robotgo.KeyToggle(c.Key, "up", c.Mods...) should work but it doesn't.
+		args := []string{c.Key, "up"}
+		for i := range c.Mods {
+			args = append(args, c.Mods[i])
+		}
+		robotgo.KeyToggle(args...)
 		log.Printf("Pressed key %v+%v", strings.Join(c.Mods, "+"), c.Key)
 	} else {
 		robotgo.KeyTap(c.Key)
+		robotgo.KeyToggle(c.Key, "up")
 		log.Printf("Pressed key %v", c.Key)
 	}
 }

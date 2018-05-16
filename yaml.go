@@ -3,6 +3,7 @@ package robotscript
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/kylelemons/go-gypsy/yaml"
 )
@@ -47,4 +48,9 @@ func getSingleKey(m yaml.Map) (string, error) {
 		key = k
 	}
 	return key, nil
+}
+
+// canonicalize converts a string to lowercase and removes outer whitespace.
+func canonicalize(s string) string {
+	return strings.TrimSpace(strings.ToLower(s))
 }
