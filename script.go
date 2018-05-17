@@ -1,9 +1,8 @@
 package robotscript
 
 import (
-	"log"
-
 	"github.com/kylelemons/go-gypsy/yaml"
+	"github.com/pkg/errors"
 )
 
 // Script is a sequence of commands to execute.
@@ -17,36 +16,31 @@ func NewScript(filename string) (*Script, error) {
 
 	file, err := yaml.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "reading script file failed")
 	}
 
 	cmdsNode, err := yaml.Child(file.Root, "commands")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "commands section not found")
 	}
 
-	cmdMaps, err := toList(cmdsNode)
-	if err != nil {
-		log.Fatal(err)
+	cmdMaps := unYAML(cmdsNode)
+	if !isList(cmdMaps) {
+		return nil, wrongOptType("script", "list", "commands", cmdMaps)
 	}
 
-	for _, cmdMap := range cmdMaps {
-		cmdMap, err := toMap(cmdMap)
-		if err != nil {
-			return nil, err
+	for _, cmdMap := range cmdMaps.([]interface{}) {
+		if !isMap(cmdMap) {
+			return nil, wrongListEntryType("script", "map", "commands", cmdMap)
 		}
+		cmdMap := cmdMap.(map[string]interface{})
 
 		cmdKey, err := getSingleKey(cmdMap)
 		if err != nil {
 			return nil, err
 		}
 
-		cmdOptions, err := toMap(cmdMap[cmdKey])
-		if err != nil {
-			return nil, err
-		}
-
-		command, err := NewCommand(cmdKey, cmdOptions)
+		command, err := NewCommand(cmdKey, cmdMap[cmdKey].(map[string]interface{}))
 		if err != nil {
 			return nil, err
 		}

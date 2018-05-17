@@ -1,8 +1,6 @@
 package robotscript
 
 import (
-	"errors"
-	"fmt"
 	"log"
 	"os/exec"
 	"strconv"
@@ -10,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-vgo/robotgo"
-	"github.com/kylelemons/go-gypsy/yaml"
+	"github.com/pkg/errors"
 )
 
 type Command interface {
@@ -18,8 +16,8 @@ type Command interface {
 	// New_____Command(options yaml.Map) (*_____Command, error)
 }
 
-// NewCommand creates a new command from a name and YAML map.
-func NewCommand(name string, options yaml.Map) (Command, error) {
+// NewCommand creates a new command from a name options map.
+func NewCommand(name string, options map[string]interface{}) (Command, error) {
 	switch canonicalize(name) {
 	case "click":
 		return NewMouseClickCommand(options)
@@ -34,7 +32,7 @@ func NewCommand(name string, options yaml.Map) (Command, error) {
 	case "type":
 		return NewTypeCommand(options)
 	default:
-		return nil, errors.New(fmt.Sprintf("unrecognized command: %v", name))
+		return nil, unrecognizedCmd(name)
 	}
 }
 
@@ -47,48 +45,55 @@ type MouseMoveCommand struct {
 }
 
 // NewMouseMoveCommand creates a new MouseMoveCommand from a YAML map.
-func NewMouseMoveCommand(options yaml.Map) (*MouseMoveCommand, error) {
+func NewMouseMoveCommand(options map[string]interface{}) (*MouseMoveCommand, error) {
 	c := &MouseMoveCommand{}
+	foundX := false
+	foundY := false
 
 	for key, val := range options {
 		switch canonicalize(key) {
 
 		case "x":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundX = true
+			if !isScalar(val) {
+				return nil, wrongOptType("mouse", "scalar", "x", val)
 			}
-			x, err := strconv.Atoi(scalar.String())
+			x, err := strconv.Atoi(val.(string))
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "mouse: option 'x'")
 			}
 			c.X = x
 
 		case "y":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundY = true
+			if !isScalar(val) {
+				return nil, wrongOptType("mouse", "scalar", "y", val)
 			}
-			y, err := strconv.Atoi(scalar.String())
+			y, err := strconv.Atoi(val.(string))
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "mouse: option 'y'")
 			}
 			c.Y = y
 
 		case "relative":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			if !isScalar(val) {
+				return nil, wrongOptType("mouse", "scalar", "relative", val)
 			}
-			relative, err := strconv.ParseBool(scalar.String())
+			relative, err := strconv.ParseBool(val.(string))
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "mouse: option 'relative'")
 			}
 			c.Relative = relative
 
 		default:
-			return nil, errors.New("unrecognized option to mouse command")
+			return nil, unrecognizedOpt("mouse", key)
 		}
+	}
+
+	if !foundX {
+		return nil, missingOpt("mouse", "x")
+	} else if !foundY {
+		return nil, missingOpt("mouse", "y")
 	}
 
 	return c, nil
@@ -116,30 +121,34 @@ type MouseClickCommand struct {
 }
 
 // NewMouseClickCommand creates a new MouseClickCommand from a YAML map.
-func NewMouseClickCommand(options yaml.Map) (*MouseClickCommand, error) {
+func NewMouseClickCommand(options map[string]interface{}) (*MouseClickCommand, error) {
 	c := &MouseClickCommand{}
+	foundButton := false
 
 	for key, val := range options {
 		switch canonicalize(key) {
 
 		case "button":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundButton = true
+			if !isScalar(val) {
+				return nil, wrongOptType("click", "scalar", "button", val)
 			}
-
-			button := canonicalize(scalar.String())
+			button := canonicalize(val.(string))
 			if button == "middle" || button == "centre" {
 				button = "center"
 			}
 			if button != "left" && button != "center" && button != "right" {
-				return nil, errors.New("invalid button for mouse click")
+				return nil, invalidOpt("click", "button", val)
 			}
 			c.Button = button
 
 		default:
-			return nil, errors.New("unrecognized option to click command")
+			return nil, unrecognizedOpt("click", key)
 		}
+	}
+
+	if !foundButton {
+		return nil, missingOpt("click", "button")
 	}
 
 	return c, nil
@@ -160,43 +169,40 @@ type KeyPressCommand struct {
 }
 
 // NewKeyPressCommand creates a new KeyPressCommand from a YAML map.
-func NewKeyPressCommand(options yaml.Map) (*KeyPressCommand, error) {
+func NewKeyPressCommand(options map[string]interface{}) (*KeyPressCommand, error) {
 	c := &KeyPressCommand{}
+	foundKey := false
 
 	for key, val := range options {
 		switch canonicalize(key) {
 
 		case "key":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundKey = true
+			if !isScalar(val) {
+				return nil, wrongOptType("keypress", "scalar", "key", val)
 			}
-			c.Key = canonicalize(scalar.String())
+			c.Key = canonicalize(val.(string))
 
 		case "mods":
 			var mods []string
-
-			modNodes, err := toList(val)
-			if err != nil {
-				modScalar, err := toScalar(val)
-				if err != nil {
-					return nil, err
+			if !isList(mods) {
+				return nil, wrongOptType("keypress", "scalar list", "mods", val)
+			}
+			for _, mod := range val.([]interface{}) {
+				if !isScalar(mod) {
+					return nil, wrongListEntryType("keypress", "scalar", "mods", mod)
 				}
-				mods = append(mods, modScalar.String())
-			} else {
-				for _, node := range modNodes {
-					scalar, err := toScalar(node)
-					if err != nil {
-						return nil, err
-					}
-					mods = append(mods, canonicalize(scalar.String()))
-				}
+				mods = append(mods, canonicalize(mod.(string)))
 			}
 			c.Mods = mods
 
 		default:
-			return nil, errors.New("unrecognized option to keypress command")
+			return nil, unrecognizedOpt("keypress", key)
 		}
+	}
+
+	if !foundKey {
+		return nil, missingOpt("keypress", "key")
 	}
 
 	return c, nil
@@ -227,21 +233,27 @@ type TypeCommand struct {
 }
 
 // NewTypeCommand creates a new TypeCommand from a YAML map.
-func NewTypeCommand(options yaml.Map) (*TypeCommand, error) {
+func NewTypeCommand(options map[string]interface{}) (*TypeCommand, error) {
 	c := &TypeCommand{}
+	foundText := false
 
 	for key, val := range options {
 		switch canonicalize(key) {
+
 		case "text":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundText = true
+			if !isScalar(val) {
+				return nil, wrongOptType("type", "scalar", "text", val)
 			}
-			c.Text = scalar.String()
+			c.Text = val.(string)
 
 		default:
-			return nil, errors.New("unrecognized option to type command")
+			return nil, unrecognizedOpt("type", key)
 		}
+	}
+
+	if !foundText {
+		return nil, missingOpt("type", "text")
 	}
 
 	return c, nil
@@ -261,26 +273,31 @@ type SleepCommand struct {
 }
 
 // NewSleepCommand creates a new SleepCommand from a YAML map.
-func NewSleepCommand(options yaml.Map) (*SleepCommand, error) {
+func NewSleepCommand(options map[string]interface{}) (*SleepCommand, error) {
 	c := &SleepCommand{}
+	foundSeconds := false
 
 	for key, val := range options {
 		switch canonicalize(key) {
 
 		case "seconds":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundSeconds = true
+			if !isScalar(val) {
+				return nil, wrongOptType("sleep", "scalar", "seconds", val)
 			}
-			seconds, err := strconv.Atoi(scalar.String())
+			seconds, err := strconv.Atoi(val.(string))
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "sleep: option 'seconds'")
 			}
 			c.Seconds = seconds
 
 		default:
-			return nil, errors.New("unrecognized option to sleep command")
+			return nil, unrecognizedOpt("sleep", key)
 		}
+	}
+
+	if !foundSeconds {
+		return nil, missingOpt("sleep", "seconds")
 	}
 
 	return c, nil
@@ -299,29 +316,33 @@ type ExecCommand struct {
 }
 
 // NewExecCommand creates a new ExecCommand from a YAML map.
-func NewExecCommand(options yaml.Map) (*ExecCommand, error) {
+func NewExecCommand(options map[string]interface{}) (*ExecCommand, error) {
 	c := &ExecCommand{}
+	foundProgram := false
 
 	for key, val := range options {
 		switch canonicalize(key) {
 
 		case "program":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			foundProgram = true
+			if !isScalar(val) {
+				return nil, wrongOptType("exec", "scalar", "program", val)
 			}
-			c.Program = scalar.String()
+			c.Program = strings.TrimSpace(val.(string))
 
 		case "args":
-			scalar, err := toScalar(val)
-			if err != nil {
-				return nil, err
+			if !isScalar(val) {
+				return nil, wrongOptType("exec", "scalar", "args", val)
 			}
-			c.Args = strings.Split(scalar.String(), " ")
+			c.Args = strings.Split(val.(string), " ")
 
 		default:
-			return nil, errors.New("unrecognized option to exec command")
+			return nil, unrecognizedOpt("exec", key)
 		}
+	}
+
+	if !foundProgram {
+		return nil, missingOpt("exec", "program")
 	}
 
 	return c, nil
