@@ -12,6 +12,8 @@ commands:
         - shift
   - sleep:
       seconds: 1
+  - type:
+      text: hello, world
   - exec:
       program: ls
       args: /home

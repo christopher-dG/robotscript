@@ -9,7 +9,7 @@ func TestNewScript(t *testing.T) {
 	if err != nil {
 		t.Errorf("Parsing script failed: %v", err)
 	}
-	if len(script.Commands) != 5 {
+	if len(script.Commands) != 6 {
 		t.Errorf("Expected script.Commands == 5, got %d", len(script.Commands))
 	}
 }

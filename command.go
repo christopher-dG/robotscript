@@ -14,13 +14,13 @@ import (
 )
 
 type Command interface {
-	Execute()
+	Execute() // Execute executes the command.
 	// New_____Command(options yaml.Map) (*_____Command, error)
 }
 
 // NewCommand creates a new command from a name and YAML map.
 func NewCommand(name string, options yaml.Map) (Command, error) {
-	switch strings.ToLower(name) {
+	switch canonicalize(name) {
 	case "click":
 		return NewMouseClickCommand(options)
 	case "exec":
@@ -31,6 +31,8 @@ func NewCommand(name string, options yaml.Map) (Command, error) {
 		return NewMouseMoveCommand(options)
 	case "sleep":
 		return NewSleepCommand(options)
+	case "type":
+		return NewTypeCommand(options)
 	default:
 		return nil, errors.New(fmt.Sprintf("unrecognized command: %v", name))
 	}
@@ -49,7 +51,7 @@ func NewMouseMoveCommand(options yaml.Map) (*MouseMoveCommand, error) {
 	c := &MouseMoveCommand{}
 
 	for key, val := range options {
-		switch strings.ToLower(key) {
+		switch canonicalize(key) {
 
 		case "x":
 			scalar, err := toScalar(val)
@@ -105,7 +107,7 @@ func (c *MouseMoveCommand) Execute() {
 	}
 
 	robotgo.MoveMouse(x, y)
-	log.Printf("Moved mouse to (%v, %v)", x, y)
+	log.Printf("moved mouse to (%v, %v)", x, y)
 }
 
 // MouseClickCommand clicks the mouse.
@@ -118,7 +120,7 @@ func NewMouseClickCommand(options yaml.Map) (*MouseClickCommand, error) {
 	c := &MouseClickCommand{}
 
 	for key, val := range options {
-		switch strings.ToLower(key) {
+		switch canonicalize(key) {
 
 		case "button":
 			scalar, err := toScalar(val)
@@ -126,8 +128,8 @@ func NewMouseClickCommand(options yaml.Map) (*MouseClickCommand, error) {
 				return nil, err
 			}
 
-			button := strings.ToLower(scalar.String())
-			if button == "centre" {
+			button := canonicalize(scalar.String())
+			if button == "middle" || button == "centre" {
 				button = "center"
 			}
 			if button != "left" && button != "center" && button != "right" {
@@ -146,7 +148,7 @@ func NewMouseClickCommand(options yaml.Map) (*MouseClickCommand, error) {
 // Execute executes the command.
 func (c *MouseClickCommand) Execute() {
 	robotgo.MouseClick(c.Button)
-	log.Printf("Clicked %v mouse button", c.Button)
+	log.Printf("clicked %v mouse button", c.Button)
 }
 
 // Keyboard commands
@@ -162,7 +164,7 @@ func NewKeyPressCommand(options yaml.Map) (*KeyPressCommand, error) {
 	c := &KeyPressCommand{}
 
 	for key, val := range options {
-		switch strings.ToLower(key) {
+		switch canonicalize(key) {
 
 		case "key":
 			scalar, err := toScalar(val)
@@ -211,12 +213,44 @@ func (c *KeyPressCommand) Execute() {
 			args = append(args, c.Mods[i])
 		}
 		robotgo.KeyToggle(args...)
-		log.Printf("Pressed key %v+%v", strings.Join(c.Mods, "+"), c.Key)
+		log.Printf("pressed key %v+%v", strings.Join(c.Mods, "+"), c.Key)
 	} else {
 		robotgo.KeyTap(c.Key)
 		robotgo.KeyToggle(c.Key, "up")
-		log.Printf("Pressed key %v", c.Key)
+		log.Printf("pressed key %v", c.Key)
 	}
+}
+
+// TypeCommand types some text.
+type TypeCommand struct {
+	Text string
+}
+
+// NewTypeCommand creates a new TypeCommand from a YAML map.
+func NewTypeCommand(options yaml.Map) (*TypeCommand, error) {
+	c := &TypeCommand{}
+
+	for key, val := range options {
+		switch canonicalize(key) {
+		case "text":
+			scalar, err := toScalar(val)
+			if err != nil {
+				return nil, err
+			}
+			c.Text = scalar.String()
+
+		default:
+			return nil, errors.New("unrecognized option to type command")
+		}
+	}
+
+	return c, nil
+}
+
+// Execute executes the command.
+func (c *TypeCommand) Execute() {
+	robotgo.TypeString(c.Text)
+	log.Printf("typed '%s'", strings.Replace(c.Text, "\n", "\\n", -1))
 }
 
 // Misc commands
@@ -231,7 +265,7 @@ func NewSleepCommand(options yaml.Map) (*SleepCommand, error) {
 	c := &SleepCommand{}
 
 	for key, val := range options {
-		switch strings.ToLower(key) {
+		switch canonicalize(key) {
 
 		case "seconds":
 			scalar, err := toScalar(val)
@@ -255,7 +289,7 @@ func NewSleepCommand(options yaml.Map) (*SleepCommand, error) {
 // Execute executes the command.
 func (c *SleepCommand) Execute() {
 	time.Sleep(time.Second * time.Duration(c.Seconds))
-	log.Printf("Slept for %v seconds", c.Seconds)
+	log.Printf("slept for %v seconds", c.Seconds)
 }
 
 // ExecCommand executes a system command.
@@ -269,7 +303,7 @@ func NewExecCommand(options yaml.Map) (*ExecCommand, error) {
 	c := &ExecCommand{}
 
 	for key, val := range options {
-		switch strings.ToLower(key) {
+		switch canonicalize(key) {
 
 		case "program":
 			scalar, err := toScalar(val)
@@ -297,8 +331,8 @@ func NewExecCommand(options yaml.Map) (*ExecCommand, error) {
 func (c *ExecCommand) Execute() {
 	cmd := exec.Command(c.Program, c.Args...)
 	if err := cmd.Start(); err != nil {
-		log.Printf("Error executing command %v: %v", cmd, err)
+		log.Printf("error executing command %v: %v", cmd, err)
 	} else {
-		log.Printf("Executed command: %v %v", c.Program, strings.Join(c.Args, " "))
+		log.Printf("executed command: %v %v", c.Program, strings.Join(c.Args, " "))
 	}
 }
