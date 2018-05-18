@@ -2,21 +2,21 @@ package robotscript
 
 import (
 	"log"
+	"math"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-vgo/robotgo"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
 
 type Command interface {
 	Execute() // Execute executes the command.
-	// New_____Command(options yaml.Map) (*_____Command, error)
 }
 
-// NewCommand creates a new command from a name options map.
+// NewCommand creates a new command from an options map.
 func NewCommand(name string, options map[string]interface{}) (Command, error) {
 	switch canonicalize(name) {
 	case "click":
@@ -32,7 +32,7 @@ func NewCommand(name string, options map[string]interface{}) (Command, error) {
 	case "type":
 		return NewTypeCommand(options)
 	default:
-		return nil, unrecognizedCmd(name)
+		return nil, errors.Errorf("unrecognized command '%v'", name)
 	}
 }
 
@@ -44,60 +44,16 @@ type MouseMoveCommand struct {
 	Relative bool
 }
 
-// NewMouseMoveCommand creates a new MouseMoveCommand from a YAML map.
+// NewMouseMoveCommand creates a new MouseMoveCommand from an options map.
 func NewMouseMoveCommand(options map[string]interface{}) (*MouseMoveCommand, error) {
 	c := &MouseMoveCommand{}
-	foundX := false
-	foundY := false
-
-	for key, val := range options {
-		switch canonicalize(key) {
-
-		case "x":
-			foundX = true
-			if !isScalar(val) {
-				return nil, wrongOptType("mouse", "scalar", "x", val)
-			}
-			x, err := strconv.Atoi(val.(string))
-			if err != nil {
-				return nil, errors.Wrap(err, "mouse: option 'x'")
-			}
-			c.X = x
-
-		case "y":
-			foundY = true
-			if !isScalar(val) {
-				return nil, wrongOptType("mouse", "scalar", "y", val)
-			}
-			y, err := strconv.Atoi(val.(string))
-			if err != nil {
-				return nil, errors.Wrap(err, "mouse: option 'y'")
-			}
-			c.Y = y
-
-		case "relative":
-			if !isScalar(val) {
-				return nil, wrongOptType("mouse", "scalar", "relative", val)
-			}
-			relative, err := strconv.ParseBool(val.(string))
-			if err != nil {
-				return nil, errors.Wrap(err, "mouse: option 'relative'")
-			}
-			c.Relative = relative
-
-		default:
-			return nil, unrecognizedOpt("mouse", key)
-		}
+	if err := checkRequiredOpts(options, "x", "y"); err != nil {
+		return nil, errors.Wrap(err, "mouse")
 	}
-
-	if !foundX {
-		return nil, missingOpt("mouse", "x")
-	} else if !foundY {
-		return nil, missingOpt("mouse", "y")
+	if err := mapstructure.Decode(options, c); err != nil {
+		return nil, errors.Wrap(err, "mouse")
 	}
-
 	return c, nil
-
 }
 
 // Execute executes the command.
@@ -111,6 +67,8 @@ func (c *MouseMoveCommand) Execute() {
 		x, y = c.X, c.Y
 	}
 
+	x, y = int(math.Max(float64(x), 0)), int(math.Max(float64(y), 0))
+
 	robotgo.MoveMouse(x, y)
 	log.Printf("moved mouse to (%v, %v)", x, y)
 }
@@ -120,37 +78,18 @@ type MouseClickCommand struct {
 	Button string // "left", "center", or "right".
 }
 
-// NewMouseClickCommand creates a new MouseClickCommand from a YAML map.
+// NewMouseClickCommand creates a new MouseClickCommand from an options map.
 func NewMouseClickCommand(options map[string]interface{}) (*MouseClickCommand, error) {
 	c := &MouseClickCommand{}
-	foundButton := false
-
-	for key, val := range options {
-		switch canonicalize(key) {
-
-		case "button":
-			foundButton = true
-			if !isScalar(val) {
-				return nil, wrongOptType("click", "scalar", "button", val)
-			}
-			button := canonicalize(val.(string))
-			if button == "middle" || button == "centre" {
-				button = "center"
-			}
-			if button != "left" && button != "center" && button != "right" {
-				return nil, invalidOpt("click", "button", val)
-			}
-			c.Button = button
-
-		default:
-			return nil, unrecognizedOpt("click", key)
-		}
+	if err := checkRequiredOpts(options, "button"); err != nil {
+		return nil, errors.Wrap(err, "click")
 	}
-
-	if !foundButton {
-		return nil, missingOpt("click", "button")
+	if err := mapstructure.Decode(options, c); err != nil {
+		return nil, errors.Wrap(err, "click")
 	}
-
+	if c.Button == "middle" || c.Button == "centre" {
+		c.Button = "center"
+	}
 	return c, nil
 }
 
@@ -164,47 +103,19 @@ func (c *MouseClickCommand) Execute() {
 
 // KeyPressCommand presses a key.
 type KeyPressCommand struct {
-	Key  string // TODO: Check robotgo docs for keycode specifics.
+	Key  string // https://github.com/go-vgo/robotgo/blob/master/docs/keys.md
 	Mods []string
 }
 
-// NewKeyPressCommand creates a new KeyPressCommand from a YAML map.
+// NewKeyPressCommand creates a new KeyPressCommand from an options map.
 func NewKeyPressCommand(options map[string]interface{}) (*KeyPressCommand, error) {
 	c := &KeyPressCommand{}
-	foundKey := false
-
-	for key, val := range options {
-		switch canonicalize(key) {
-
-		case "key":
-			foundKey = true
-			if !isScalar(val) {
-				return nil, wrongOptType("keypress", "scalar", "key", val)
-			}
-			c.Key = canonicalize(val.(string))
-
-		case "mods":
-			var mods []string
-			if !isList(mods) {
-				return nil, wrongOptType("keypress", "scalar list", "mods", val)
-			}
-			for _, mod := range val.([]interface{}) {
-				if !isScalar(mod) {
-					return nil, wrongListEntryType("keypress", "scalar", "mods", mod)
-				}
-				mods = append(mods, canonicalize(mod.(string)))
-			}
-			c.Mods = mods
-
-		default:
-			return nil, unrecognizedOpt("keypress", key)
-		}
+	if err := checkRequiredOpts(options, "key"); err != nil {
+		return nil, errors.Wrap(err, "keypress")
 	}
-
-	if !foundKey {
-		return nil, missingOpt("keypress", "key")
+	if err := mapstructure.Decode(options, c); err != nil {
+		return nil, errors.Wrap(err, "keypress")
 	}
-
 	return c, nil
 }
 
@@ -232,30 +143,15 @@ type TypeCommand struct {
 	Text string
 }
 
-// NewTypeCommand creates a new TypeCommand from a YAML map.
+// NewTypeCommand creates a new TypeCommand from an options map.
 func NewTypeCommand(options map[string]interface{}) (*TypeCommand, error) {
 	c := &TypeCommand{}
-	foundText := false
-
-	for key, val := range options {
-		switch canonicalize(key) {
-
-		case "text":
-			foundText = true
-			if !isScalar(val) {
-				return nil, wrongOptType("type", "scalar", "text", val)
-			}
-			c.Text = val.(string)
-
-		default:
-			return nil, unrecognizedOpt("type", key)
-		}
+	if err := checkRequiredOpts(options, "text"); err != nil {
+		return nil, errors.Wrap(err, "type")
 	}
-
-	if !foundText {
-		return nil, missingOpt("type", "text")
+	if err := mapstructure.Decode(options, c); err != nil {
+		return nil, errors.Wrap(err, "type")
 	}
-
 	return c, nil
 }
 
@@ -272,34 +168,15 @@ type SleepCommand struct {
 	Seconds int
 }
 
-// NewSleepCommand creates a new SleepCommand from a YAML map.
+// NewSleepCommand creates a new SleepCommand from an options map.
 func NewSleepCommand(options map[string]interface{}) (*SleepCommand, error) {
 	c := &SleepCommand{}
-	foundSeconds := false
-
-	for key, val := range options {
-		switch canonicalize(key) {
-
-		case "seconds":
-			foundSeconds = true
-			if !isScalar(val) {
-				return nil, wrongOptType("sleep", "scalar", "seconds", val)
-			}
-			seconds, err := strconv.Atoi(val.(string))
-			if err != nil {
-				return nil, errors.Wrap(err, "sleep: option 'seconds'")
-			}
-			c.Seconds = seconds
-
-		default:
-			return nil, unrecognizedOpt("sleep", key)
-		}
+	if err := checkRequiredOpts(options, "seconds"); err != nil {
+		return nil, errors.Wrap(err, "sleep")
 	}
-
-	if !foundSeconds {
-		return nil, missingOpt("sleep", "seconds")
+	if err := mapstructure.Decode(options, c); err != nil {
+		return nil, errors.Wrap(err, "sleep")
 	}
-
 	return c, nil
 }
 
@@ -312,48 +189,27 @@ func (c *SleepCommand) Execute() {
 // ExecCommand executes a system command.
 type ExecCommand struct {
 	Program string
-	Args    []string
+	Args    string
 }
 
-// NewExecCommand creates a new ExecCommand from a YAML map.
+// NewExecCommand creates a new ExecCommand from an options map.
 func NewExecCommand(options map[string]interface{}) (*ExecCommand, error) {
 	c := &ExecCommand{}
-	foundProgram := false
-
-	for key, val := range options {
-		switch canonicalize(key) {
-
-		case "program":
-			foundProgram = true
-			if !isScalar(val) {
-				return nil, wrongOptType("exec", "scalar", "program", val)
-			}
-			c.Program = strings.TrimSpace(val.(string))
-
-		case "args":
-			if !isScalar(val) {
-				return nil, wrongOptType("exec", "scalar", "args", val)
-			}
-			c.Args = strings.Split(val.(string), " ")
-
-		default:
-			return nil, unrecognizedOpt("exec", key)
-		}
+	if err := checkRequiredOpts(options, "program"); err != nil {
+		return nil, errors.Wrap(err, "exec")
 	}
-
-	if !foundProgram {
-		return nil, missingOpt("exec", "program")
+	if err := mapstructure.Decode(options, c); err != nil {
+		return nil, errors.Wrap(err, "exec")
 	}
-
 	return c, nil
 }
 
 // Execute executes the command.
 func (c *ExecCommand) Execute() {
-	cmd := exec.Command(c.Program, c.Args...)
+	cmd := exec.Command(c.Program, strings.Split(c.Args, " ")...)
 	if err := cmd.Start(); err != nil {
 		log.Printf("error executing command %v: %v", cmd, err)
 	} else {
-		log.Printf("executed command: %v %v", c.Program, strings.Join(c.Args, " "))
+		log.Printf("executed command: %v %v", c.Program, c.Args)
 	}
 }

@@ -17,13 +17,37 @@ robotscript script.yml
 
 ## Script Reference
 
+Script files are written in [YAML format](http://yaml.org/).
+The commands are fairly self-explanatory/self-documenting.
+Here is a comprehensive example:
+
+```yaml
+commands:
+  - mouse:                 # command: moves the mouse cursor
+      x: 200               # required: integer: x pixel
+      y: 200               # required: integer: y pixel
+      relative: false      # optional: boolean: moves cursor relative to original position
+  - click:                 # command: clicks a mouse button
+      button: left         # required: string: mouse button (left, right, or center)
+  - keypress:              # command: presses a key
+      key: c               # required: string: key to be pressed (case insensitive)
+      mods:                # optional: list<string>: modifier keys
+        - shift            # note: this must be a list, even if there's only one
+  - sleep:                 # command: does nothing for some time
+      seconds: 1           # required: integer: seconds to wait
+  - type:                  # command: types some text
+      text: hello, world   # required: string: text to be typed
+  - exec:                  # command: executes a program
+      program: stat        # required: string: program to run
+      args: /tmp/fakefile  # optional: string: command line arguments (not a list)
 ```
-TODO (look in test.yml for now)
-```
+
+For a key naming reference, see [here](https://github.com/go-vgo/robotgo/blob/master/docs/keys.md).
+
 
 ### Acknowledgements
 
-Robotscript is built with the following open source libraries.
+The following open source libraries have made my life much easier:
 
 * [robotgo](https://github.com/go-vgo/robotgo)
-* [go-gypsy](https://github.com/kylelemons/go-gypsy)
+* [mapstructure](https://github.com/mitchellh/mapstructure)

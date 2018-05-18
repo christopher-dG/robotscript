@@ -24,7 +24,7 @@ addons:
 
 install: go get -t -v ./...
 # Tests can't be run; robotgo requires a keyboard.
-script: go build -v cmd/robotscript/main.go
+script: go build -v cmd/robotscript/robotscript.go
 
 notifications:
   email: false

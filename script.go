@@ -1,8 +1,10 @@
 package robotscript
 
 import (
-	"github.com/kylelemons/go-gypsy/yaml"
+	"io/ioutil"
+
 	"github.com/pkg/errors"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // Script is a sequence of commands to execute.
@@ -10,37 +12,36 @@ type Script struct {
 	Commands []Command
 }
 
-// NewScript parses a YAML file into a new Script.
+// NewScript parses the YAML file at filename into a new Script.
 func NewScript(filename string) (*Script, error) {
-	script := &Script{}
-
-	file, err := yaml.ReadFile(filename)
+	contents, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading script file failed")
 	}
+	return newScript(contents)
+}
 
-	cmdsNode, err := yaml.Child(file.Root, "commands")
+// newScript parses the contents of a YAML file into a new Script.
+func newScript(contents []byte) (*Script, error) {
+	m := make(map[string][]map[string]map[string]interface{})
+	err := yaml.Unmarshal(contents, &m)
 	if err != nil {
-		return nil, errors.Wrap(err, "commands section not found")
+		return nil, errors.Wrap(err, "unmarshaling YAML failed")
 	}
 
-	cmdMaps := unYAML(cmdsNode)
-	if !isList(cmdMaps) {
-		return nil, wrongOptType("script", "list", "commands", cmdMaps)
+	commands, ok := m["commands"]
+	if !ok {
+		return nil, errors.New("script: missing 'commands' section")
 	}
 
-	for _, cmdMap := range cmdMaps.([]interface{}) {
-		if !isMap(cmdMap) {
-			return nil, wrongListEntryType("script", "map", "commands", cmdMap)
-		}
-		cmdMap := cmdMap.(map[string]interface{})
-
-		cmdKey, err := getSingleKey(cmdMap)
+	script := &Script{}
+	for _, cmd := range commands {
+		key, err := getSingleKey(cmd)
 		if err != nil {
 			return nil, err
 		}
 
-		command, err := NewCommand(cmdKey, cmdMap[cmdKey].(map[string]interface{}))
+		command, err := NewCommand(key, cmd[key])
 		if err != nil {
 			return nil, err
 		}
