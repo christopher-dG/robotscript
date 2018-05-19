@@ -31,12 +31,12 @@ func TestNewMouseMoveCommand(t *testing.T) {
 		t.Error("expected cmd.Relative == false, got true")
 	}
 
-	cmd, err = NewMouseMoveCommand(map[string]interface{}{"x": 20})
+	_, err = NewMouseMoveCommand(map[string]interface{}{"x": 20})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
 
-	cmd, err = NewMouseMoveCommand(map[string]interface{}{"foo": true})
+	_, err = NewMouseMoveCommand(map[string]interface{}{"foo": true})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
@@ -60,12 +60,12 @@ func TestNewMouseClickCommand(t *testing.T) {
 		t.Errorf("expected cmd.Button == 'left', got '%v'", cmd.Button)
 	}
 
-	cmd, err = NewMouseClickCommand(map[string]interface{}{})
+	_, err = NewMouseClickCommand(map[string]interface{}{})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
 
-	cmd, err = NewMouseClickCommand(map[string]interface{}{"foo": true})
+	_, err = NewMouseClickCommand(map[string]interface{}{"foo": true})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
@@ -86,12 +86,12 @@ func TestNewKeyPressCommand(t *testing.T) {
 		t.Errorf("expected cmd.Key == 'a', got '%v'", cmd.Key)
 	}
 
-	cmd, err = NewKeyPressCommand(map[string]interface{}{})
+	_, err = NewKeyPressCommand(map[string]interface{}{})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
 
-	cmd, err = NewKeyPressCommand(map[string]interface{}{"foo": true})
+	_, err = NewKeyPressCommand(map[string]interface{}{"foo": true})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
@@ -99,19 +99,16 @@ func TestNewKeyPressCommand(t *testing.T) {
 
 func TestExecuteKeyPressCommand(t *testing.T) {
 	cmd := KeyPressCommand{Key: "enter"}
-	bytes := []byte("dummy")
 	cmd.Execute()
-	if bytes, _, _ = bufio.NewReader(os.Stdin).ReadLine(); len(bytes) > 0 {
-		t.Errorf("expected input == '', got '%v'", bytes)
+	if _, _, err := bufio.NewReader(os.Stdin).ReadLine(); err != nil {
+		t.Errorf("expected err == nil, got '%v'", err)
 	}
 
 	cmd = KeyPressCommand{Key: "enter", Mods: []string{"shift"}}
-	bytes = []byte("dummy")
 	cmd.Execute()
-	if bytes, _, _ = bufio.NewReader(os.Stdin).ReadLine(); len(bytes) > 0 {
-		t.Errorf("expected input == '', got '%v'", bytes)
+	if _, _, err := bufio.NewReader(os.Stdin).ReadLine(); err != nil {
+		t.Errorf("expected err == nil, got '%v'", err)
 	}
-
 }
 
 func TestNewTypeCommand(t *testing.T) {
@@ -123,12 +120,12 @@ func TestNewTypeCommand(t *testing.T) {
 		t.Errorf("expected cmd.Text == 'A', got '%v'", cmd.Text)
 	}
 
-	cmd, err = NewTypeCommand(map[string]interface{}{})
+	_, err = NewTypeCommand(map[string]interface{}{})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
 
-	cmd, err = NewTypeCommand(map[string]interface{}{"foo": true})
+	_, err = NewTypeCommand(map[string]interface{}{"foo": true})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
@@ -152,12 +149,12 @@ func TestNewSleepCommand(t *testing.T) {
 		t.Errorf("expected cmd.Seconds == 5, got '%v'", cmd.Seconds)
 	}
 
-	cmd, err = NewSleepCommand(map[string]interface{}{})
+	_, err = NewSleepCommand(map[string]interface{}{})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
 
-	cmd, err = NewSleepCommand(map[string]interface{}{"foo": true})
+	_, err = NewSleepCommand(map[string]interface{}{"foo": true})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
@@ -182,12 +179,12 @@ func TestNewExecCommand(t *testing.T) {
 		t.Errorf("expected cmd.Program == 'ls', got '%v'", cmd.Program)
 	}
 
-	cmd, err = NewExecCommand(map[string]interface{}{})
+	_, err = NewExecCommand(map[string]interface{}{})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}
 
-	cmd, err = NewExecCommand(map[string]interface{}{"foo": true})
+	_, err = NewExecCommand(map[string]interface{}{"foo": true})
 	if err == nil {
 		t.Error("expected err != nil, got nil")
 	}

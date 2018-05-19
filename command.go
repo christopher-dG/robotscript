@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Command defines the Execute function which any command must implement.
 type Command interface {
 	Execute() // Execute executes the command.
 }
