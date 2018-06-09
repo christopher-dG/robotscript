@@ -27,6 +27,7 @@ commands:
       x: 200               # required: integer: x pixel
       y: 200               # required: integer: y pixel
       relative: false      # optional: boolean: moves cursor relative to original position
+      smooth: true         # optional: boolean: moves cursor smoothly instead of instantly
   - click:                 # command: clicks a mouse button
       button: left         # required: string: mouse button (left, right, or center)
   - keypress:              # command: presses a key

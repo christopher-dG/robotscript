@@ -43,6 +43,7 @@ func NewCommand(name string, options map[string]interface{}) (Command, error) {
 type MouseMoveCommand struct {
 	X, Y     int // Pixels.
 	Relative bool
+	Smooth   bool
 }
 
 // NewMouseMoveCommand creates a new MouseMoveCommand from an options map.
@@ -70,7 +71,12 @@ func (c *MouseMoveCommand) Execute() {
 
 	x, y = int(math.Max(float64(x), 0)), int(math.Max(float64(y), 0))
 
-	robotgo.MoveMouse(x, y)
+	if c.Smooth {
+		// TODO: Customize the speed? I don't really know how these arguments work.
+		robotgo.MoveMouseSmooth(x, y, 0.1, 0.1)
+	} else {
+		robotgo.MoveMouse(x, y)
+	}
 	log.Printf("moved mouse to (%v, %v)", x, y)
 }
 
